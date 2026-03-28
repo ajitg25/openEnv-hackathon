@@ -1,0 +1,20 @@
+services:
+  shop-sku-manager:
+    image: ghcr.io/meta-pytorch/openenv-base:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./envs:/app/envs
+    working_dir: /app/envs
+    environment:
+      - SHOP_DIFFICULTY=easy
+      - PYTHONPATH=/app/envs
+    command: >
+      sh -c "apt-get update > /dev/null 2>&1 && apt-get install -y --no-install-recommends git > /dev/null 2>&1 &&
+             pip install numpy 'openenv-core @ git+https://github.com/meta-pytorch/OpenEnv.git' --quiet &&
+             uvicorn shop_sku_manager.server.app:app --host 0.0.0.0 --port 8000 --reload"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
