@@ -5,8 +5,8 @@ AI agent that learns to optimize retail inventory management decisions.
 ## Setup
 
 ```bash
-uv venv && source .venv/bin/activate
-uv pip install -e .
+uv sync
+source .venv/bin/activate
 ```
 
 ## Running
