@@ -1,0 +1,114 @@
+---
+# Shop SKU Manager Environment Specification
+
+name: "shop_sku_manager"
+version: "0.1.0"
+description: "Inventory management environment where agents learn to optimize product ordering decisions"
+
+author: "Ajit Gupta"
+license: "BSD-3-Clause"
+
+# Environment interface specification
+interface:
+  action_type: "OrderAction"
+  observation_type: "ShopObservation"
+  state_type: "ShopState"
+
+# Task specifications
+tasks:
+  - id: "easy"
+    name: "Single Product, Steady Demand"
+    description: |
+      Manage 3 SKUs with stable, predictable demand.
+      No seasonality, simple patterns.
+      Agent should achieve ~85% of maximum possible profit.
+    difficulty: 1
+    expected_baseline_score: 0.30
+    expected_agent_score: 0.85
+
+  - id: "medium"
+    name: "Multiple Products, Variable Demand"
+    description: |
+      Manage 5 SKUs with variable demand (weekday vs weekend patterns).
+      Includes seasonal trends and different lead times.
+      Agent should achieve ~70% of maximum possible profit.
+    difficulty: 2
+    expected_baseline_score: 0.40
+    expected_agent_score: 0.70
+
+  - id: "hard"
+    name: "Complex Multi-SKU with Constraints"
+    description: |
+      Manage 7 SKUs with high variability, seasonality, and constraints.
+      Budget limitations, minimum order quantities, premium emergency shipping.
+      Agent should achieve ~55% of maximum possible profit.
+    difficulty: 3
+    expected_baseline_score: 0.20
+    expected_agent_score: 0.55
+
+# Observation space
+observation_space:
+  type: "object"
+  properties:
+    inventory_levels:
+      type: "dict[str, float]"
+      description: "Current stock quantity for each SKU"
+    demand_forecast:
+      type: "dict[str, float]"
+      description: "Predicted demand for today"
+    sales_last_7_days:
+      type: "dict[str, list[float]]"
+      description: "Historical sales for each SKU (last 7 days)"
+    budget_remaining:
+      type: "float"
+      description: "Remaining budget for orders"
+    stockout_flags:
+      type: "dict[str, bool]"
+      description: "Which SKUs are out of stock"
+
+# Action space
+action_space:
+  type: "object"
+  properties:
+    orders:
+      type: "dict[str, float]"
+      description: "Quantities to order for each SKU (empty dict = no orders)"
+    emergency:
+      type: "bool"
+      description: "Use premium emergency shipping (50% cost increase)"
+
+# Reward specification
+reward:
+  type: "float"
+  range: [-1.0, 1.0]
+  description: |
+    Daily reward = Revenue - Costs
+    Provides dense signal for:
+    - Sales revenue (+)
+    - Ordering costs (-)
+    - Storage costs (-)
+    - Stockout penalties (-)
+
+# Episode configuration
+episode:
+  length: 30  # days per episode
+  reset_distribution: "deterministic"
+
+# Training configuration
+training:
+  api_requirements:
+    - "openai_api_key"  # For baseline inference
+  baseline_model: "gpt-4"
+  expected_improvements:
+    - "Episode 1-5: Agent learns basic patterns"
+    - "Episode 10-20: Agent optimizes for demand variability"
+    - "Episode 30+: Agent achieves near-optimal performance"
+
+# Deployment information
+deployment:
+  docker_image: "openenv-base:latest"
+  port: 8000
+  environment_variables:
+    - name: "SHOP_DIFFICULTY"
+      description: "Task difficulty level (easy/medium/hard)"
+      default: "easy"
