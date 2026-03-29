@@ -1,3 +1,12 @@
+---
+title: Shop SKU Manager
+emoji: 🛒
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
 # Shop SKU Manager - OpenEnv Hackathon
 
 AI agent that learns to optimize retail inventory management decisions.
