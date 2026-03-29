@@ -29,6 +29,7 @@ Usage:
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -111,18 +112,20 @@ async def baseline_agent():
     print("   (Make sure server started with: SHOP_DIFFICULTY=easy)")
     print("="*70 + "\n")
 
+    server_url = os.getenv("SERVER_URL", "https://ajitg25-openenv-hackathon.hf.space/")
+    print(f"   Server: {server_url}\n")
+
     for episode in range(3):  # 3 episodes
         print(f"⚡ Episode {episode+1}/3...")
 
         # Create new client for this episode
         try:
-            env = ShopSKUManagerEnv(base_url="http://localhost:8000")
+            env = ShopSKUManagerEnv(base_url=server_url)
         except Exception as e:
-            print(f"\n❌ Error: Could not connect to server at http://localhost:8000")
+            print(f"\n❌ Error: Could not connect to server at {server_url}")
             print(f"   Details: {str(e)}")
-            print(f"   Make sure the server is running:")
-            print(f"   PYTHONPATH=src:envs SHOP_DIFFICULTY=easy \\")
-            print(f"     uv run uvicorn envs.shop_sku_manager.server.app:app --host 127.0.0.1 --port 8000\n")
+            print(f"   Make sure the server is running, or set SERVER_URL env var:")
+            print(f"   SERVER_URL=https://ajitg25-openenv-hackathon.hf.space uv run python examples/shop_sku_baseline_ollama.py\n")
             sys.exit(1)
 
         try:
