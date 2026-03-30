@@ -14,3 +14,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "envs"))
 from shop_sku_manager.server.app import app  # noqa: F401, E402
 
 __all__ = ["app"]
+
+
+def main(host: str = "0.0.0.0", port: int = 8000):
+    """Entry point for running the server."""
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    main()
