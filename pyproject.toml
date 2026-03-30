@@ -19,6 +19,9 @@ dependencies = [
     "openenv-core @ git+https://github.com/meta-pytorch/OpenEnv.git",
 ]
 
+[project.scripts]
+serve = "server.app:app"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
