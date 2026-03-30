@@ -29,6 +29,9 @@ dev = [
     "ruff>=0.4.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["server*", "envs*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
