@@ -25,9 +25,9 @@ sys.path.insert(0, str(Path(__file__).parent / "envs"))
 from shop_sku_manager.client import ShopSKUManagerEnv
 from shop_sku_manager.models import OrderAction
 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 SERVER_URL = os.getenv("OPENENV_SERVER_URL", "http://localhost:8000")
 
 TASK_NAME = os.getenv("SHOP_SKU_TASK", "easy")
@@ -144,6 +144,11 @@ def get_order(client: OpenAI, obs) -> OrderAction:
 # ---------------------------------------------------------------------------
 
 async def main() -> None:
+    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
+    print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
+    print(f"[DEBUG] SERVER_URL={SERVER_URL}", flush=True)
+    print(f"[DEBUG] API_KEY={'set' if API_KEY else 'NOT SET'}", flush=True)
+
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
     env = ShopSKUManagerEnv(base_url=SERVER_URL)
