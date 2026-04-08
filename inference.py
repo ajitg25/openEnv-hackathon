@@ -31,8 +31,8 @@ API_KEY = os.environ["API_KEY"]
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 SERVER_URL = os.getenv("OPENENV_SERVER_URL", "http://localhost:7860")
 
-TASK_NAME = os.getenv("SHOP_SKU_TASK", "easy")
 BENCHMARK = "shop_sku_manager"
+TASKS = ["easy", "medium", "hard"]
 MAX_STEPS = 30
 TEMPERATURE = 0.3
 MAX_TOKENS = 200
@@ -64,6 +64,11 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
         f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
         flush=True,
     )
+
+
+def clamp_score(raw: float) -> float:
+    """Clamp score to strictly between 0 and 1 (exclusive)."""
+    return min(max(raw, 0.01), 0.99)
 
 
 # ---------------------------------------------------------------------------
@@ -140,41 +145,28 @@ def get_order(client: OpenAI, obs) -> OrderAction:
 
 
 # ---------------------------------------------------------------------------
-# Main episode loop
+# Run one task (one [START] / [END] block)
 # ---------------------------------------------------------------------------
 
-async def main() -> None:
-    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
-    print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
-    print(f"[DEBUG] SERVER_URL={SERVER_URL}", flush=True)
-    print(f"[DEBUG] API_KEY set={bool(API_KEY)}", flush=True)
-
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-
-    env = ShopSKUManagerEnv(base_url=SERVER_URL)
-
+async def run_task(client: OpenAI, task: str) -> None:
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
     success = False
 
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task=task, env=BENCHMARK, model=MODEL_NAME)
 
+    env = ShopSKUManagerEnv(base_url=SERVER_URL)
     try:
-        print("[DEBUG] Calling env.reset()...", flush=True)
         result = await env.reset()
-        print(f"[DEBUG] env.reset() done. done={result.done}", flush=True)
 
         for step in range(1, MAX_STEPS + 1):
             if result.done:
-                print(f"[DEBUG] Episode done at step {step}", flush=True)
                 break
 
             obs = result.observation
-            print(f"[DEBUG] Step {step}: calling LLM...", flush=True)
             action = get_order(client, obs)
             action_str = json.dumps(action.model_dump(), separators=(",", ":"))
-            print(f"[DEBUG] Step {step}: LLM returned, calling env.step()...", flush=True)
 
             result = await env.step(action)
 
@@ -191,13 +183,16 @@ async def main() -> None:
                 break
 
         if rewards:
-            score = sum(rewards) / MAX_TOTAL_REWARD
-            score = min(max(score, 0.0), 1.0)
+            raw_score = sum(rewards) / MAX_TOTAL_REWARD
+            score = clamp_score(raw_score)
+        else:
+            score = 0.01
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as e:
-        print(f"[DEBUG] Episode error: {e}", flush=True)
+        print(f"[DEBUG] Task {task} error: {e}", flush=True)
         traceback.print_exc()
+        score = 0.01
 
     finally:
         try:
@@ -205,6 +200,22 @@ async def main() -> None:
         except Exception as e:
             print(f"[DEBUG] env.close() error: {e}", flush=True)
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+
+# ---------------------------------------------------------------------------
+# Main — run all 3 tasks
+# ---------------------------------------------------------------------------
+
+async def main() -> None:
+    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
+    print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
+    print(f"[DEBUG] SERVER_URL={SERVER_URL}", flush=True)
+    print(f"[DEBUG] API_KEY set={bool(API_KEY)}", flush=True)
+
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+
+    for task in TASKS:
+        await run_task(client, task)
 
 
 if __name__ == "__main__":
