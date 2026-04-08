@@ -5,16 +5,17 @@ Inference script for Shop SKU Manager environment.
 Connects to the environment server and runs an LLM-powered agent
 that makes inventory ordering decisions to maximize profit.
 
-Required env vars:
-    API_BASE_URL   The API endpoint for the LLM.
+Required env vars (injected by validator):
+    API_BASE_URL   The LiteLLM proxy endpoint.
+    API_KEY        The API key for the proxy.
     MODEL_NAME     The model identifier to use for inference.
-    HF_TOKEN       Your Hugging Face / API key.
 """
 
 import asyncio
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import List, Optional
 
@@ -25,10 +26,10 @@ sys.path.insert(0, str(Path(__file__).parent / "envs"))
 from shop_sku_manager.client import ShopSKUManagerEnv
 from shop_sku_manager.models import OrderAction
 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-SERVER_URL = os.getenv("OPENENV_SERVER_URL", "http://localhost:8000")
+SERVER_URL = os.getenv("OPENENV_SERVER_URL", "http://localhost:7860")
 
 TASK_NAME = os.getenv("SHOP_SKU_TASK", "easy")
 BENCHMARK = "shop_sku_manager"
@@ -37,7 +38,6 @@ TEMPERATURE = 0.3
 MAX_TOKENS = 200
 SUCCESS_SCORE_THRESHOLD = 0.1
 
-# Reward range is [-1, 1] per step. Max total = MAX_STEPS * 1.0
 MAX_TOTAL_REWARD = MAX_STEPS * 1.0
 
 
@@ -147,7 +147,7 @@ async def main() -> None:
     print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
     print(f"[DEBUG] SERVER_URL={SERVER_URL}", flush=True)
-    print(f"[DEBUG] API_KEY={'set' if API_KEY else 'NOT SET'}", flush=True)
+    print(f"[DEBUG] API_KEY set={bool(API_KEY)}", flush=True)
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
@@ -161,15 +161,20 @@ async def main() -> None:
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
+        print("[DEBUG] Calling env.reset()...", flush=True)
         result = await env.reset()
+        print(f"[DEBUG] env.reset() done. done={result.done}", flush=True)
 
         for step in range(1, MAX_STEPS + 1):
             if result.done:
+                print(f"[DEBUG] Episode done at step {step}", flush=True)
                 break
 
             obs = result.observation
+            print(f"[DEBUG] Step {step}: calling LLM...", flush=True)
             action = get_order(client, obs)
             action_str = json.dumps(action.model_dump(), separators=(",", ":"))
+            print(f"[DEBUG] Step {step}: LLM returned, calling env.step()...", flush=True)
 
             result = await env.step(action)
 
@@ -185,7 +190,6 @@ async def main() -> None:
             if done:
                 break
 
-        # Normalize score to [0, 1]
         if rewards:
             score = sum(rewards) / MAX_TOTAL_REWARD
             score = min(max(score, 0.0), 1.0)
@@ -193,6 +197,7 @@ async def main() -> None:
 
     except Exception as e:
         print(f"[DEBUG] Episode error: {e}", flush=True)
+        traceback.print_exc()
 
     finally:
         try:
