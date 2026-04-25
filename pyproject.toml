@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openenv-hackathon"
 version = "0.1.0"
-description = "Shop SKU Manager - OpenEnv hackathon submission"
-readme = "envs/shop_sku_manager/README.md"
+description = "Ambulance Green Corridor - OpenEnv hackathon submission"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.104.0",
