@@ -14,17 +14,17 @@
 # ============================================================
 
 # ── CELL 1: Install ──────────────────────────────────────────────────────────
-# In Colab, run this cell first (runtime will restart after install)
+# In Colab: Runtime → Change runtime type → T4 GPU, then run this cell.
+# The runtime will restart after pip install — that's expected, re-run from Cell 2.
 """
 !pip install -q "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 !pip install -q trl peft accelerate
 !pip install -q "openenv-core[core]>=0.2.2"
 
-# Clone OpenEnv to get the ambulance_env
-!git clone -q https://github.com/meta-pytorch/OpenEnv.git /content/OpenEnv
+# Clone the hackathon repo (contains ambulance_env)
+!git clone -q https://github.com/ajitg25/openEnv-hackathon.git /content/openEnv-hackathon
 import sys
-sys.path.insert(0, '/content/OpenEnv/src')
-sys.path.insert(0, '/content/OpenEnv/envs')
+sys.path.insert(0, '/content/openEnv-hackathon/envs')
 """
 
 # ── CELL 2: Imports & server startup ─────────────────────────────────────────
@@ -42,10 +42,9 @@ import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
 
-# Adjust paths for local development (remove if running in Colab with the
-# git clone above already in sys.path)
+# Adjust paths for local development.
+# In Colab the git clone in Cell 1 already puts envs/ on sys.path — skip this.
 REPO_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT / "envs"))
 
 from ambulance_env import AmbulanceEnv
@@ -62,7 +61,7 @@ _server_proc = subprocess.Popen(
      "--host", "0.0.0.0", "--port", "8000", "--log-level", "error"],
     env={
         **os.environ,
-        "PYTHONPATH": f"{REPO_ROOT}/src:{REPO_ROOT}/envs",
+        "PYTHONPATH": f"{REPO_ROOT}/envs",
         "AMBULANCE_DIFFICULTY": DIFFICULTY,
     },
 )
@@ -482,7 +481,7 @@ ax.set_ylim(0, 105)
 ax.legend(fontsize=8)
 
 plt.tight_layout()
-out_path = Path(__file__).parent / "ambulance_training_results.png"
+out_path = Path(globals().get("__file__", "/content/ambulance_grpo_training.py")).parent / "ambulance_training_results.png"
 plt.savefig(out_path, dpi=150, bbox_inches="tight")
 plt.show()
 print(f"Plot saved → {out_path}")
