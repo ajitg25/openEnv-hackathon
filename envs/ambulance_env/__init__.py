@@ -11,7 +11,10 @@ from .models import (
     AmbulanceAction,
     AmbulanceObservation,
     AmbulanceState,
+    DynamicEvent,
     HospitalInfo,
+    RoadSegment,
+    RouteOption,
     SignalControl,
     SignalInfo,
 )
@@ -23,7 +26,10 @@ __all__ = [
     "AmbulanceAction",
     "AmbulanceObservation",
     "AmbulanceState",
+    "DynamicEvent",
     "HospitalInfo",
+    "RoadSegment",
+    "RouteOption",
     "SignalControl",
     "SignalInfo",
 ]
