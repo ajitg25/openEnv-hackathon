@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ambulance Green Corridor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="header">
+  <h1><span>🚑</span> Ambulance Green Corridor</h1>
+  <p>LLM-powered emergency dispatch &amp; traffic signal control &mdash; Bangalore city simulation</p>
+</div>
+
+<div class="controls">
+  <select id="difficulty">
+    <option value="easy">Easy (6&times;6)</option>
+    <option value="medium">Medium (8&times;8)</option>
+    <option value="hard">Hard (12&times;12)</option>
+  </select>
+  <select id="policy">
+    <option value="smart">Smart (trained)</option>
+    <option value="naive">Naive (toggle all)</option>
+    <option value="none">No control</option>
+  </select>
+  <button class="sec" id="resetBtn">Reset</button>
+  <button class="sec" id="stepBtn">Step</button>
+  <button class="pri" id="playBtn">&#9654; Play</button>
+  <button class="danger" id="eventBtn">&#9888; Block Road</button>
+  <button class="warn" id="spikeBtn">&#128293; Spike Traffic</button>
+  <div class="reward" id="rewardBox">Reward: 0</div>
+</div>
+
+<div class="main">
+  <div class="map-wrap" id="mapWrap">
+    <div id="map"></div>
+    <div class="time-bar">
+      <div class="time-fill" id="timeFill"></div>
+    </div>
+    <div class="time-label" id="timeLabel">0s / 300s</div>
+  </div>
+  <div class="sidebar">
+    <div class="panel">
+      <h3>Metrics</h3>
+      <pre id="metrics">Press Reset or Play to start</pre>
+    </div>
+    <div class="panel">
+      <h3>Agent Log</h3>
+      <pre id="log"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "ambulance-green-corridor",
+  "version": "1.0.0",
+  "description": "City traffic visualization for Ambulance Green Corridor OpenEnv environment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "http-proxy-middleware": "^3.0.0"
+  }
+}

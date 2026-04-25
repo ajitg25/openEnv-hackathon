@@ -28,4 +28,5 @@ ENV AMBULANCE_DIFFICULTY="easy"
 
 EXPOSE 7860
 
-CMD ["uvicorn", "ambulance_env.server.app:app", "--host", "0.0.0.0", "--port", "7860", "--app-dir", "/app/envs", "--ws-ping-interval", "300", "--ws-ping-timeout", "300"]
+# Showcase server: serves frontend + env API on one port
+CMD ["python", "showcase.py"]
