@@ -489,7 +489,7 @@ class AmbulanceEnvironment(Environment):
         # 8. Check if current route is blocked → force re-route
         if self._route_blocked():
             self._recompute_route()
-            if new_events:
+            if self._active_events:
                 self._successful_reroutes += 1
 
         # 9. Advance time
