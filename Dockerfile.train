@@ -5,9 +5,9 @@ RUN apt-get update && \
     ln -sf /usr/bin/python3 /usr/bin/python && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir \
-    "unsloth[cu121] @ git+https://github.com/unslothai/unsloth.git" \
-    trl peft accelerate nest_asyncio \
+# Install unsloth from PyPI (latest release), then the rest
+RUN pip3 install --no-cache-dir "unsloth>=2026.4" && \
+    pip3 install --no-cache-dir trl peft accelerate nest_asyncio \
     pydantic fastapi uvicorn websockets httpx matplotlib numpy
 
 RUN pip3 install --no-cache-dir --no-deps "openenv-core>=0.2.2"
@@ -23,5 +23,4 @@ ENV AMBULANCE_DIFFICULTY="easy"
 
 EXPOSE 7860
 
-# Train, then serve results as a simple file server so you can download plots
 CMD ["sh", "-c", "python3 /app/train.py && echo 'Training complete. Serving plots...' && cd /app/plots && python3 -m http.server 7860"]
