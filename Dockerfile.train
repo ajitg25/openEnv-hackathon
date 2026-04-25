@@ -1,7 +1,7 @@
 FROM huggingface/transformers-pytorch-gpu:latest
 
 RUN pip install --no-cache-dir --upgrade transformers && \
-    pip install --no-cache-dir nest_asyncio peft trl bitsandbytes \
+    pip install --no-cache-dir nest_asyncio peft trl \
     pydantic fastapi uvicorn websockets httpx matplotlib
 
 RUN pip install --no-cache-dir "openenv-core[core]>=0.2.2"

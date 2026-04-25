@@ -32,7 +32,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import get_peft_model, LoraConfig, TaskType
 
 nest_asyncio.apply()
@@ -66,18 +66,15 @@ print("Server ready.")
 
 # ── 2. Load model ──────────────────────────────────────────────────────────
 print(f"Loading {MODEL_NAME}...")
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.float16,
-)
 base_model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME, quantization_config=bnb_config, device_map="auto",
+    MODEL_NAME, torch_dtype=torch.float16, device_map="auto",
 )
+print("Base model loaded.")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 tokenizer.padding_side = "left"
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
+print("Tokenizer loaded.")
 
 lora_config = LoraConfig(
     r=16, lora_alpha=16, lora_dropout=0,
@@ -86,7 +83,7 @@ lora_config = LoraConfig(
 )
 model = get_peft_model(base_model, lora_config)
 model.gradient_checkpointing_enable()
-print(f"Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+print(f"LoRA ready. Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
 
 # ── 3. Prompt formatters ──────────────────────────────────────────────────
@@ -260,7 +257,8 @@ def evaluate(num_episodes=8):
 
 # ── 7. Baseline ──────────────────────────────────────────────────────────
 print("\n=== Baseline evaluation ===")
-baseline = evaluate(num_episodes=8)
+print("Running episode 1 of 2...")
+baseline = evaluate(num_episodes=2)
 print(f"BASELINE  reward={baseline['mean_reward']:.1f}  arrival={baseline['arrival_rate']:.0%}  "
       f"efficiency={baseline['mean_efficiency']:.0%}  reroutes={baseline['mean_reroutes']:.1f}  "
       f"time={baseline['mean_time']:.0f}s")
