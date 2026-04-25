@@ -10,7 +10,7 @@ RUN pip3 install --no-cache-dir "unsloth>=2026.4" && \
     pip3 install --no-cache-dir trl peft accelerate nest_asyncio \
     pydantic fastapi uvicorn websockets httpx matplotlib numpy
 
-RUN pip3 install --no-cache-dir --no-deps "openenv-core>=0.2.2"
+RUN pip3 install --no-cache-dir "openenv-core[core]>=0.2.2"
 
 RUN useradd -m -u 1000 appuser
 WORKDIR /app
