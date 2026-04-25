@@ -5,7 +5,7 @@ colorFrom: red
 colorTo: green
 sdk: docker
 app_port: 7860
-suggested_hardware: a10g-small
+suggested_hardware: cpu-basic
 ---
 
 # Ambulance Green Corridor — OpenEnv Hackathon 2026
