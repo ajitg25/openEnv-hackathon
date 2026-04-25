@@ -70,7 +70,7 @@ print("Server ready.")
 # ── 2. Load model ──────────────────────────────────────────────────────────
 print(f"Loading {MODEL_NAME}...")
 base_model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME, torch_dtype=torch.float16, device_map="auto",
+    MODEL_NAME, dtype=torch.float16, device_map="auto",
 )
 print("Base model loaded.")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)

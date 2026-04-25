@@ -1,31 +1,20 @@
-FROM python:3.12-slim
+FROM pytorch/pytorch:2.4.0-cuda12.4-cudnn9-runtime
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir transformers>=4.45.0 accelerate && \
+    pip install --no-cache-dir nest_asyncio peft trl \
+    pydantic fastapi uvicorn websockets httpx matplotlib
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    mv /root/.local/bin/uv /usr/local/bin/uv && \
-    mv /root/.local/bin/uvx /usr/local/bin/uvx
+RUN pip install --no-cache-dir "openenv-core[core]>=0.2.2"
 
 RUN useradd -m -u 1000 appuser
-
 WORKDIR /app
-
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-install-project --no-editable || true
-
 COPY . .
-RUN uv sync --no-editable
-
-RUN chown -R appuser:appuser /app
-
+RUN mkdir -p /app/plots && chown -R appuser:appuser /app
 USER appuser
 
-ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/envs:/app:$PYTHONPATH"
 ENV AMBULANCE_DIFFICULTY="easy"
 
 EXPOSE 7860
 
-CMD ["uvicorn", "ambulance_env.server.app:app", "--host", "0.0.0.0", "--port", "7860", "--app-dir", "/app/envs", "--ws-ping-interval", "300", "--ws-ping-timeout", "300"]
+CMD ["sh", "-c", "python3 /app/train.py; echo 'Training done (exit $?). Serving plots...'; mkdir -p /app/plots && cd /app/plots && python3 -m http.server 7860"]
