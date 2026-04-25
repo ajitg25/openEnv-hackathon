@@ -37,7 +37,10 @@ from peft import get_peft_model, LoraConfig, TaskType
 
 nest_asyncio.apply()
 
-sys.path.insert(0, "/app/envs")
+# Support both Docker (/app) and Kaggle (/kaggle/working/repo) paths
+_REPO_ROOT = os.environ.get("REPO_ROOT", "/app")
+_ENVS_PATH = os.path.join(_REPO_ROOT, "envs")
+sys.path.insert(0, _ENVS_PATH)
 from ambulance_env import AmbulanceEnv
 from ambulance_env.models import AmbulanceAction, SignalControl
 
@@ -50,7 +53,7 @@ NUM_ITERATIONS = 10
 GROUP_SIZE = 4
 BETA_KL = 0.01
 LR = 5e-5
-PLOT_DIR = Path("/app/plots")
+PLOT_DIR = Path(os.environ.get("PLOT_DIR", "/app/plots"))
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── 1. Start server ────────────────────────────────────────────────────────
@@ -58,7 +61,7 @@ print("Starting ambulance_env server...")
 server_proc = subprocess.Popen(
     [sys.executable, "-m", "uvicorn", "ambulance_env.server.app:app",
      "--host", "0.0.0.0", "--port", "8000", "--log-level", "error"],
-    env={**os.environ, "PYTHONPATH": "/app/envs", "AMBULANCE_DIFFICULTY": DIFFICULTY},
+    env={**os.environ, "PYTHONPATH": _ENVS_PATH, "AMBULANCE_DIFFICULTY": DIFFICULTY},
 )
 time.sleep(4)
 print("Server ready.")
