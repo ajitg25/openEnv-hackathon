@@ -32,7 +32,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
-from unsloth import FastLanguageModel
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import get_peft_model, LoraConfig, TaskType
 
 nest_asyncio.apply()
 
@@ -43,7 +44,7 @@ from ambulance_env.models import AmbulanceAction, SignalControl
 # ── Config ──────────────────────────────────────────────────────────────────
 ENV_URL = "http://localhost:8000"
 DIFFICULTY = os.getenv("AMBULANCE_DIFFICULTY", "easy")
-MODEL_NAME = "unsloth/Qwen2.5-0.5B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 MAX_SEQ_LEN = 1024
 NUM_ITERATIONS = 10
 GROUP_SIZE = 4
@@ -65,19 +66,26 @@ print("Server ready.")
 
 # ── 2. Load model ──────────────────────────────────────────────────────────
 print(f"Loading {MODEL_NAME}...")
-model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name=MODEL_NAME, max_seq_length=MAX_SEQ_LEN,
-    load_in_4bit=True, dtype=None,
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16,
 )
-model = FastLanguageModel.get_peft_model(
-    model, r=16,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    lora_alpha=16, lora_dropout=0, bias="none",
-    use_gradient_checkpointing="unsloth", random_state=42,
+base_model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME, quantization_config=bnb_config, device_map="auto",
 )
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 tokenizer.padding_side = "left"
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
+
+lora_config = LoraConfig(
+    r=16, lora_alpha=16, lora_dropout=0,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+    task_type=TaskType.CAUSAL_LM,
+)
+model = get_peft_model(base_model, lora_config)
+model.gradient_checkpointing_enable()
 print(f"Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
 

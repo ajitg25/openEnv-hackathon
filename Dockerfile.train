@@ -1,16 +1,9 @@
-FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+FROM huggingface/transformers-pytorch-gpu:latest
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-venv python3-pip git curl gcc g++ && \
-    ln -sf /usr/bin/python3 /usr/bin/python && \
-    rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir nest_asyncio peft trl bitsandbytes \
+    pydantic fastapi uvicorn websockets httpx matplotlib
 
-# Install unsloth from PyPI (latest release), then the rest
-RUN pip3 install --no-cache-dir "unsloth>=2026.4" && \
-    pip3 install --no-cache-dir trl peft accelerate nest_asyncio \
-    pydantic fastapi uvicorn websockets httpx matplotlib numpy
-
-RUN pip3 install --no-cache-dir "openenv-core[core]>=0.2.2"
+RUN pip install --no-cache-dir "openenv-core[core]>=0.2.2"
 
 RUN useradd -m -u 1000 appuser
 WORKDIR /app
@@ -23,4 +16,4 @@ ENV AMBULANCE_DIFFICULTY="easy"
 
 EXPOSE 7860
 
-CMD ["sh", "-c", "python3 /app/train.py && echo 'Training complete. Serving plots...' && cd /app/plots && python3 -m http.server 7860"]
+CMD ["sh", "-c", "python3 /app/train.py && echo 'Training done. Serving plots...' && cd /app/plots && python3 -m http.server 7860"]
