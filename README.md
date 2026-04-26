@@ -18,6 +18,7 @@ suggested_hardware: cpu-basic
 > green corridor under real-world constraints like potholes, gridlock, accidents,
 > and road closures.
 
+**Theme:** #3.1 — World Modeling / Professional Tasks  
 **HF Space (live environment):** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor
 
 ---
