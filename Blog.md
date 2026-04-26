@@ -160,12 +160,6 @@ async with AmbulanceEnv(base_url="https://ajitg25-ambulance-green-corridor.hf.sp
 
 ---
 
-## What's Next
-
-- Scale training to **medium/hard difficulty** (12×12 grid, accidents, road closures, potholed roads)
-- **Multi-agent:** two ambulances sharing one signal controller — cooperation required
-- **Visualization UI:** city grid showing signal states, ambulance position, and re-routing decisions in real time
-
 ---
 
 *Built for the OpenEnv Hackathon India 2026.*
