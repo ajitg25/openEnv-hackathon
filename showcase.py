@@ -1,15 +1,17 @@
 """
 Ambulance Green Corridor — Showcase Server
 ===========================================
-Single server that serves the visual frontend AND the environment API.
-One command to run the entire demo:
+Mounts the real OpenEnv app (with /ws, /reset, /step, /state, /schema, /mcp)
+and adds the visual frontend + extra demo endpoints on top.
 
     AMBULANCE_DIFFICULTY=easy python showcase.py
 
-Then open http://localhost:7860
+Open http://localhost:7860 for the visual demo.
+The validator can connect to ws://localhost:7860/ws as usual.
 """
 
 import os
+import random
 import sys
 from pathlib import Path
 from typing import Optional
@@ -23,16 +25,38 @@ from pydantic import BaseModel
 # Ensure envs/ is importable
 sys.path.insert(0, str(Path(__file__).parent / "envs"))
 
-import random
-
 from ambulance_env.server.ambulance_environment import AmbulanceEnvironment, _seg_key
-from ambulance_env.models import AmbulanceAction, SignalControl
+from ambulance_env.models import AmbulanceAction, AmbulanceObservation, SignalControl
 
 # ---------------------------------------------------------------------------
-# App
+# The real OpenEnv app — has /ws, /reset, /step, /state, /schema, /health, /mcp
 # ---------------------------------------------------------------------------
+try:
+    from openenv.core.env_server.http_server import create_app as create_openenv_app
+except ImportError:
+    create_openenv_app = None
 
-app = FastAPI(title="Ambulance Green Corridor")
+_difficulty = os.getenv("AMBULANCE_DIFFICULTY", "easy")
+FRONTEND_DIR = Path(__file__).parent / "frontend" / "public"
+
+
+def _create_env() -> AmbulanceEnvironment:
+    return AmbulanceEnvironment(difficulty=_difficulty)
+
+
+if create_openenv_app:
+    # Build the real OpenEnv app with all endpoints including WebSocket
+    app = create_openenv_app(
+        _create_env,
+        AmbulanceAction,
+        AmbulanceObservation,
+        env_name="ambulance_env",
+        max_concurrent_envs=4,
+    )
+else:
+    # Fallback if openenv not installed
+    app = FastAPI(title="Ambulance Green Corridor")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,33 +64,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_env: Optional[AmbulanceEnvironment] = None
-_difficulty = os.getenv("AMBULANCE_DIFFICULTY", "easy")
-
-FRONTEND_DIR = Path(__file__).parent / "frontend" / "public"
-
 
 # ---------------------------------------------------------------------------
-# Environment API (under /api prefix)
+# Stateful env instance for the frontend demo
+# (separate from the OpenEnv per-session envs used by the validator)
 # ---------------------------------------------------------------------------
 
-class StepBody(BaseModel):
+_demo_env: Optional[AmbulanceEnvironment] = None
+
+
+class DemoStepBody(BaseModel):
     hospital_id: Optional[str] = None
     signal_controls: list = []
     preferred_direction: Optional[str] = None
 
 
 @app.post("/api/reset")
-def reset():
-    global _env
-    _env = AmbulanceEnvironment(difficulty=_difficulty)
-    obs = _env.reset()
+def demo_reset():
+    global _demo_env
+    _demo_env = AmbulanceEnvironment(difficulty=_difficulty)
+    obs = _demo_env.reset()
     return {"observation": obs.model_dump()}
 
 
 @app.post("/api/step")
-def step(body: StepBody):
-    if _env is None:
+def demo_step(body: DemoStepBody):
+    if _demo_env is None:
         return {"error": "Call /api/reset first"}
     controls = [
         SignalControl(row=c["row"], col=c["col"], phase=c["phase"])
@@ -78,7 +101,7 @@ def step(body: StepBody):
         signal_controls=controls,
         preferred_direction=body.preferred_direction,
     )
-    obs = _env.step(action)
+    obs = _demo_env.step(action)
     return {
         "observation": obs.model_dump(),
         "reward": obs.reward,
@@ -87,18 +110,18 @@ def step(body: StepBody):
 
 
 @app.get("/api/state")
-def state():
-    if _env is None:
-        return {"error": "No active env"}
-    return _env.state.model_dump()
+def demo_state():
+    if _demo_env is None:
+        return {"error": "No active demo env"}
+    return _demo_env.state.model_dump()
 
 
 @app.get("/api/roads")
-def roads():
-    if _env is None:
+def demo_roads():
+    if _demo_env is None:
         return {"error": "Call /api/reset first"}
     result = []
-    for seg_key, seg in _env._segments.items():
+    for seg_key, seg in _demo_env._segments.items():
         pos_list = list(seg_key)
         a = pos_list[0] if isinstance(pos_list[0], tuple) else tuple(pos_list[0])
         b = pos_list[1] if isinstance(pos_list[1], tuple) else tuple(pos_list[1])
@@ -113,38 +136,35 @@ def roads():
 
 
 @app.get("/api/signals")
-def signals():
-    if _env is None:
+def demo_signals():
+    if _demo_env is None:
         return {"error": "Call /api/reset first"}
     result = {}
-    for (r, c), phase in _env._signals.items():
+    for (r, c), phase in _demo_env._signals.items():
         result[f"{r},{c}"] = phase
     return {"signals": result}
 
 
 @app.post("/api/trigger_event")
-def trigger_event():
-    """Force an obstacle on or near the ambulance's upcoming route."""
-    if _env is None:
+def demo_trigger_event():
+    if _demo_env is None:
         return {"error": "Call /api/reset first"}
-    if not _env._route or _env._route_idx >= len(_env._route) - 2:
+    if not _demo_env._route or _demo_env._route_idx >= len(_demo_env._route) - 2:
         return {"error": "No upcoming route to block"}
 
-    # Pick a segment 3-5 steps ahead on the route (not the immediate next one)
-    route = _env._route
-    idx = _env._route_idx
+    route = _demo_env._route
+    idx = _demo_env._route_idx
     candidates = []
     for i in range(idx + 3, min(idx + 6, len(route) - 1)):
         key = _seg_key(route[i], route[i + 1])
-        seg = _env._segments.get(key)
+        seg = _demo_env._segments.get(key)
         if seg and not seg.blocked:
             candidates.append((key, seg, route[i], route[i + 1]))
 
-    # If nothing ahead, try any unblocked segment near the route
     if not candidates:
         for i in range(idx + 1, min(idx + 4, len(route) - 1)):
             key = _seg_key(route[i], route[i + 1])
-            seg = _env._segments.get(key)
+            seg = _demo_env._segments.get(key)
             if seg and not seg.blocked:
                 candidates.append((key, seg, route[i], route[i + 1]))
 
@@ -153,109 +173,43 @@ def trigger_event():
 
     key, seg, pos_a, pos_b = random.choice(candidates)
     event_type = random.choice(["accident", "road_closure"])
+    seg.blocked = True
+    desc = f"{'Accident' if event_type == 'accident' else 'Road closure'} between {pos_a} and {pos_b}!"
 
-    if event_type == "accident":
-        seg.blocked = True
-        desc = f"Accident between {pos_a} and {pos_b} — road blocked!"
-    else:
-        seg.blocked = True
-        desc = f"Road closure between {pos_a} and {pos_b} — construction!"
-
-    # Also spike traffic on nearby segments
-    for sk, s in _env._segments.items():
+    for sk, s in _demo_env._segments.items():
         if not s.blocked:
-            pos_list = list(sk)
-            for p in pos_list:
+            for p in list(sk):
                 p = p if isinstance(p, tuple) else tuple(p)
                 if abs(p[0] - pos_a[0]) <= 1 and abs(p[1] - pos_a[1]) <= 1:
                     s.current_traffic = min(1.0, s.current_traffic + 0.3)
                     break
 
-    return {
-        "event": event_type,
-        "blocked": [list(pos_a), list(pos_b)],
-        "description": desc,
-    }
+    return {"event": event_type, "blocked": [list(pos_a), list(pos_b)], "description": desc}
 
 
 @app.post("/api/spike_traffic")
-def spike_traffic():
-    """Spike traffic volume across random segments to simulate congestion."""
-    if _env is None:
+def demo_spike_traffic():
+    if _demo_env is None:
         return {"error": "Call /api/reset first"}
     spiked = 0
-    for key, seg in _env._segments.items():
+    for key, seg in _demo_env._segments.items():
         if not seg.blocked and random.random() < 0.3:
             seg.current_traffic = min(1.0, seg.current_traffic + random.uniform(0.2, 0.5))
             spiked += 1
-    return {"spiked": spiked, "total": len(_env._segments)}
+    return {"spiked": spiked, "total": len(_demo_env._segments)}
 
 
 @app.get("/api/health")
-def health():
+def demo_health():
     return {"status": "ok", "difficulty": _difficulty}
 
 
 # ---------------------------------------------------------------------------
-# OpenEnv-compatible endpoints (no /api prefix — for the validator)
-# The validator expects POST /reset, POST /step, GET /state at the root.
-# These share the same _env instance as the /api/* routes.
-# ---------------------------------------------------------------------------
-
-class ValidatorStepBody(BaseModel):
-    action: Optional[dict] = None
-
-@app.post("/reset")
-def validator_reset():
-    global _env
-    _env = AmbulanceEnvironment(difficulty=_difficulty)
-    obs = _env.reset()
-    return {"observation": obs.model_dump()}
-
-@app.post("/step")
-def validator_step(body: ValidatorStepBody):
-    if _env is None:
-        return {"error": "Call /reset first"}
-    action_data = body.action or {}
-    controls = [
-        SignalControl(row=c["row"], col=c["col"], phase=c["phase"])
-        for c in action_data.get("signal_controls", [])
-        if isinstance(c, dict) and "row" in c
-    ]
-    action = AmbulanceAction(
-        hospital_id=action_data.get("hospital_id"),
-        signal_controls=controls,
-        preferred_direction=action_data.get("preferred_direction"),
-    )
-    obs = _env.step(action)
-    return {
-        "observation": obs.model_dump(),
-        "reward": obs.reward,
-        "done": obs.done,
-    }
-
-@app.get("/state")
-def validator_state():
-    if _env is None:
-        return {"error": "No active env"}
-    return {"state": _env.state.model_dump()}
-
-@app.get("/health")
-def validator_health():
-    return {"status": "ok", "difficulty": _difficulty}
-
-
-# ---------------------------------------------------------------------------
-# Serve frontend static files
+# Serve frontend
 # ---------------------------------------------------------------------------
 
 @app.get("/web")
-async def serve_index():
-    return FileResponse(FRONTEND_DIR / "index.html")
-
-# Also serve at root for convenience
-@app.get("/")
-async def serve_root():
+async def serve_web():
     return FileResponse(FRONTEND_DIR / "index.html")
 
 app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
@@ -269,7 +223,9 @@ app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "7860"))
-    print(f"\n  🚑 Ambulance Green Corridor")
-    print(f"  Open http://localhost:{port}")
-    print(f"  Difficulty: {_difficulty}\n")
+    print(f"\n  Ambulance Green Corridor")
+    print(f"  Visual demo : http://localhost:{port}/web")
+    print(f"  OpenEnv API : http://localhost:{port}/docs")
+    print(f"  WebSocket   : ws://localhost:{port}/ws")
+    print(f"  Difficulty  : {_difficulty}\n")
     uvicorn.run(app, host="0.0.0.0", port=port)
