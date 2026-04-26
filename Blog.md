@@ -4,6 +4,8 @@
 
 **One-line summary:** We train an LLM to act as an emergency dispatcher + city traffic signal manager, navigating a partially observable city with real-world constraints (gridlock, potholes, accidents, hospital capacity) to get ambulances to the right hospital as fast as possible.
 
+**Demo video:** https://youtu.be/9O5z4IXXtcc
+
 ---
 
 ## The Capability Gap We Are Targeting
@@ -145,6 +147,7 @@ The training curve shows the characteristic GRPO exploration-convergence pattern
 
 ## Live Demo
 
+**Demo video:** https://youtu.be/9O5z4IXXtcc  
 **Environment (OpenEnv WebSocket):** `wss://ajitg25-ambulance-green-corridor.hf.space/ws`  
 **Visual simulation:** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor  
 **GitHub (full code + notebook):** https://github.com/ajitg25/openEnv-hackathon/tree/final  
