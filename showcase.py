@@ -73,6 +73,9 @@ app.add_middleware(
 _demo_env: Optional[AmbulanceEnvironment] = None
 
 
+class DemoResetBody(BaseModel):
+    difficulty: Optional[str] = None
+
 class DemoStepBody(BaseModel):
     hospital_id: Optional[str] = None
     signal_controls: list = []
@@ -80,9 +83,12 @@ class DemoStepBody(BaseModel):
 
 
 @app.post("/api/reset")
-def demo_reset():
+def demo_reset(body: DemoResetBody = None):
     global _demo_env
-    _demo_env = AmbulanceEnvironment(difficulty=_difficulty)
+    diff = (body and body.difficulty) or _difficulty
+    if diff not in ("easy", "medium", "hard"):
+        diff = "easy"
+    _demo_env = AmbulanceEnvironment(difficulty=diff)
     obs = _demo_env.reset()
     return {"observation": obs.model_dump()}
 

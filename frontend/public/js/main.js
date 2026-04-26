@@ -139,8 +139,10 @@ function animateMarker(marker, fromLL, toLL, durationMs) {
 
 // ── API ──────────────────────────────────────────────────────────────
 async function apiReset() {
+  const difficulty = document.getElementById("difficulty").value;
   const res = await fetch(`${API}/reset`, {
-    method: "POST", headers: {"Content-Type":"application/json"}, body: "{}",
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ difficulty }),
   });
   return (await res.json()).observation;
 }
