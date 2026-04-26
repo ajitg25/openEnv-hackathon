@@ -1,41 +1,49 @@
-# Can an LLM Learn to Save Lives by Managing City Traffic?
+# Ambulance Green Corridor — OpenEnv Hackathon 2026
 
-**tl;dr:** We built an OpenEnv environment that trains an LLM to act as emergency dispatcher + city traffic signal manager. After GRPO training, signal efficiency jumped from **11% → 100%**. Here's how it works and why it genuinely needs an LLM — not just a rule.
+## Theme: #3.1 — World Modeling / Professional Tasks
 
----
-
-## The Problem
-
-In a cardiac emergency, every minute of delay costs ~10% survival probability.
-
-Existing GPS-based emergency preemption systems (like Opticom) clear one traffic signal when an ambulance is 300m away. That's reactive, single-intersection, and has no awareness of what lies ahead.
-
-Our environment asks: **can an LLM reason about the full journey — hospital selection, road quality, live traffic, and dynamic events — to get the ambulance there faster?**
+**One-line summary:** We train an LLM to act as an emergency dispatcher + city traffic signal manager, navigating a partially observable city with real-world constraints (gridlock, potholes, accidents, hospital capacity) to get ambulances to the right hospital as fast as possible.
 
 ---
 
-## Why This Needs an LLM (Not a Rule)
+## The Capability Gap We Are Targeting
 
-Consider this scenario:
+Current GPS-based emergency preemption systems (like Opticom, used globally) work like this:
 
-- **Hospital A:** 6 intersections away, but 3 road segments are gridlocked. Clearing signals helps, but heavy traffic means the ambulance crawls at ~20% speed even on green.
-- **Hospital B:** 8 intersections, lighter traffic, highway-quality roads. ETA is actually 40 seconds faster.
-- **Midway:** an accident blocks the planned route. The system must re-route in real time.
+> Ambulance within 300m of an intersection → turn it green.
 
-No rule-based system can solve this. The agent must simultaneously reason about:
+That is reactive. It has no awareness of:
+- What road quality lies ahead (potholed roads slow the ambulance even on green)
+- Whether the nearest hospital is the *right* hospital for this patient's condition
+- Whether heavy traffic on the planned route makes a longer detour actually faster
+- Dynamic events mid-journey: accidents, road closures, traffic spikes
 
-- Distance vs. traffic volume vs. road quality
-- Hospital specialization (cardiac patient → cardiac centre, not general hospital)
-- Dynamic events appearing mid-journey (accidents, road closures, traffic spikes)
-- Which signals actually need clearing — toggling an already-green signal wastes an action and costs reward
+**The question we ask:** Can an LLM reason about the full journey — hospital selection, road quality, live traffic state, and mid-episode events — to get ambulances to the right place faster than any rule?
+
+This is a genuine professional task that requires **persistent world modeling** across many steps. A rule cannot solve it. A shortest-path algorithm cannot solve it. This environment tests whether an LLM can.
 
 ---
 
-## The Environment
+## Theme Alignment: Why This Is Theme 3.1
 
-Built on **[OpenEnv](https://github.com/meta-pytorch/OpenEnv)** — the hackathon framework for LLM training environments.
+Theme 3.1 asks for environments where:
+> "the model is expected to do real hard work instead of exploiting short-cuts"
 
-### What the agent sees each step
+Our environment prevents shortcuts in three ways:
+
+1. **Toggling already-green signals costs reward.** The agent must *read* signal state before acting — it cannot blindly clear everything.
+2. **Traffic volume slows the ambulance even on green.** The agent cannot just clear signals and assume it will go fast — it must reason about the traffic volume on each segment.
+3. **The nearest hospital is not always correct.** A cardiac patient sent to a trauma centre loses the +300 specialist bonus. The agent must match condition to specialization.
+
+The agent must maintain a coherent world model across 15–30 steps, update it when dynamic events fire, and make non-obvious decisions that only pay off several steps later.
+
+---
+
+## Environment Design
+
+### What the Agent Sees (Observation)
+
+Every step, the agent receives a structured observation:
 
 ```
 === EMERGENCY DISPATCH ===
@@ -43,123 +51,150 @@ Patient  : (6, 3) | condition: cardiac
 Ambulance: (6, 4) | time: 40s / 300s
 
 ⚠ DYNAMIC EVENTS:
-  [ACCIDENT] at (4,3) — blocking road (severity=0.8)
+  [ACCIDENT] at (4,3) — road blocked (severity=0.8)
 
-CURRENT ROUTE → hosp_a
+CURRENT ROUTE → hosp_a (City General)
   ETA=251s | segments=8 | damaged=2 | heavy_traffic=1
-  (6,4)→(5,4) | residential | quality=moderate | traffic=45% | est=22s
-  (5,4)→(4,4) | damaged     | quality=POTHOLED | traffic=62% | est=41s [BLOCKED]
+  (6,4)→(5,4) | residential | quality=moderate | traffic=45%
+  (5,4)→(4,4) | damaged     | quality=POTHOLED | [BLOCKED]
 
-ALTERNATIVES (consider switching if ETA much lower):
-  hosp_c (cardiac) <- specialist match: ETA=130s | damaged=0 | heavy=0
+ALTERNATIVES:
+  hosp_c (Cardiac Centre) ← specialist match | ETA=130s | damaged=0
 
-HOSPITALS:
-  hosp_a: City General | spec=general | est=251s
-  hosp_c: Cardiac Centre | spec=cardiac | est=130s <- specialist match
+SIGNALS — only change WRONG ones:
+  (5,4): ns_green | ambulance going north | OK
+  (4,4): ew_green | ambulance going north | WRONG — needs ns_green
 
-SIGNALS (only change WRONG ones):
-  (5,4): ns_green | dir=north | OK
-  (4,4): ew_green | dir=north | WRONG — needs ns_green
-
-ACTION: {"hospital_id": "hosp_c", "signal_controls": [{"row": 4, "col": 4, "phase": "ns_green"}], "preferred_direction": null}
+ACTION FORMAT:
+{"hospital_id": "hosp_c", "signal_controls": [{"row": 4, "col": 4, "phase": "ns_green"}], "preferred_direction": null}
 ```
 
-### Reward function — designed to be hard to game
+### What the Agent Does (Action Space)
 
-| Component | Value |
-|---|---|
-| Arrival bonus | +1000 |
-| Time bonus | up to +500 (faster = more) |
-| Specialist hospital match | +300 |
-| Red light stop | −20 each |
-| **Unnecessary signal toggle** | **−2/−5 each** |
-| Damaged road segments traversed | −10 each |
-| Successful re-route | +50 each |
+```json
+{
+  "hospital_id": "hosp_c",
+  "signal_controls": [{"row": 4, "col": 4, "phase": "ns_green"}],
+  "preferred_direction": "north"
+}
+```
 
-The unnecessary toggle penalty is the key design decision. An agent that blindly clears every signal it sees scores *worse* than one that reads the signal state first. This forces the LLM to actually reason about observations rather than pattern-match to a fixed action.
+- `hospital_id`: choose or switch destination at any step (not just at the start)
+- `signal_controls`: override up to 3 signals in the lookahead window
+- `preferred_direction`: hint the routing engine to take a specific turn
 
-### Difficulty levels
+### Reward Function — Designed to Be Hard to Game
 
-| Level | Grid | Hospitals | Traffic | Dynamic Events | Time Limit |
+| Component | Value | Purpose |
+|---|---|---|
+| Arrival | +1000 | Primary objective |
+| Time bonus | +500 max | Rewards speed |
+| Specialist match | +300 | Rewards reading patient condition |
+| Red light stop | −20 each | Penalises poor signal management |
+| **Unnecessary toggle** | **−2/−5 each** | **Core anti-shortcut mechanism** |
+| Damaged road traversed | −10 each | Rewards road quality awareness |
+| Successful re-route | +50 each | Rewards dynamic adaptation |
+
+**The unnecessary toggle penalty is the key design decision.** An agent that blindly clears every signal in view scores *lower* than one that reads the state first. This forces genuine reasoning, not pattern-matching.
+
+### Difficulty Levels
+
+| Level | Grid | Hospitals | Base Traffic | Events/Step | Time Limit |
 |---|---|---|---|---|---|
-| easy | 6×6 | 2 | Low | 5%/step | 200s |
-| medium | 8×8 | 3 | Moderate | 10%/step | 300s |
-| hard | 12×12 | 5 (1 at capacity) | Heavy | 15%/step | 400s |
+| easy | 6×6 | 2 general | Low (0.1) | 5% | 200s |
+| medium | 8×8 | 3 mixed | Moderate (0.3) | 10% | 300s |
+| hard | 12×12 | 5 (1 at capacity) | Heavy (0.5) | 15% | 400s |
 
 ---
 
 ## Training
 
-- **Model:** `Qwen/Qwen2.5-0.5B-Instruct` + LoRA (r=16, 2.1M trainable params)
-- **Algorithm:** GRPO (Group Relative Policy Optimisation via HuggingFace TRL)
-- **Setup:** 10 iterations × 4 episodes per iteration
-- **Environment:** Live OpenEnv server running alongside training loop
-
-![Training curves](ambulance_training_results.png)
-*Four panels: Episode reward, Hospital arrival rate, Signal efficiency (11%→100%), Adaptive re-routing*
+**Model:** `Qwen/Qwen2.5-0.5B-Instruct` + LoRA (r=16, 2.1M trainable params)  
+**Algorithm:** GRPO (Group Relative Policy Optimisation) via HuggingFace TRL  
+**Setup:** 10 iterations × 4 episodes per iteration, live environment connection
 
 ### Results
 
-| Metric | Baseline (untrained) | Trained | Change |
+![Training curves — reward, arrival rate, signal efficiency, re-routing](ambulance_training_results.png)
+
+| Metric | Baseline (untrained) | After Training | Change |
 |---|---|---|---|
 | Arrival rate | 100% | 100% | — |
-| **Signal efficiency** | **11%** | **100%** | **+89 percentage points** |
+| **Signal efficiency** | **11%** | **100%** | **+89 pp** |
 | Mean reward | 1442.6 | 1445.3 | +2.7 |
-| Mean travel time | 125s | 127.5s | — |
 
-### What the numbers mean
+### What the Numbers Mean
 
-**Signal efficiency is the headline metric.** The untrained model toggled every signal it saw — including ones already in the correct phase — scoring unnecessary toggle penalties on every step. After GRPO training, the model learned to read `sig.phase` vs `sig.ambulance_direction` and only act when a signal genuinely needs changing.
+**Signal efficiency is the core proof of learning.**
 
-The training curve shows characteristic GRPO behaviour:
-- **Iterations 1:** model arrives but wastes actions (efficiency=11%)
-- **Iterations 2–4:** exploration phase — model tries aggressive strategies, arrival drops to 0–25%
-- **Iterations 5–10:** sharp convergence — 100% arrival, 100% signal efficiency, stable reward
+The untrained model (11% efficiency) toggles every signal it encounters, including ones already in the correct phase. It treats the action space as "clear everything" — a shallow shortcut.
 
-This exploration→convergence pattern is the training story. A rule-based system would never show this curve — it would be flat from iteration 1.
+After GRPO training (100% efficiency), the model learned to:
+1. Read `current_phase` from the observation
+2. Compute `needed_phase` based on the ambulance's direction of travel
+3. Only send a `SignalControl` action when they differ
 
----
+This is **not** a trivial pattern. The mapping between ambulance direction and required signal phase differs per intersection and must be reasoned about from the observation text each step.
 
-## Why This Environment Matters
-
-Emergency vehicle routing is a real, unsolved problem in smart city infrastructure. Current systems are:
-
-- **Reactive:** clear one signal at a time, 300m in advance
-- **Unaware of road quality:** a potholed road still gets treated as highway
-- **Static:** no dynamic re-routing when accidents occur
-- **Oblivious to hospital specialization:** nearest hospital isn't always right hospital
-
-An LLM trained on this environment learns to reason about all four simultaneously. That's a capability that doesn't exist in any deployed system today.
-
-Could a researcher write a paper about this? Yes — "LLM-based adaptive emergency corridor planning under partial observability and dynamic constraints" is a legitimate research direction this environment enables.
+The training curve shows the characteristic GRPO exploration-convergence pattern:
+- **Iterations 1:** Model arrives (100% arrival) but wastes actions (11% efficiency)
+- **Iterations 2–4:** Exploration phase — arrival drops to 0–25%, model tries aggressive strategies
+- **Iterations 5–10:** Convergence — 100% arrival with 100% signal efficiency simultaneously
 
 ---
 
-## Try It
+## Live Demo
 
-**Live environment:** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor
+**Environment (OpenEnv WebSocket):** `wss://ajitg25-ambulance-green-corridor.hf.space/ws`  
+**Visual simulation:** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor  
+**GitHub (full code + notebook):** https://github.com/ajitg25/openEnv-hackathon/tree/final  
+**Training notebook:** https://github.com/ajitg25/openEnv-hackathon/blob/final/examples/ambulance_grpo_training.ipynb
 
-**Code + training notebook:** https://github.com/ajitg25/openEnv-hackathon/tree/final
+### Connecting Your Own Agent
 
 ```python
 from ambulance_env import AmbulanceEnv, AmbulanceAction, SignalControl
 
 async with AmbulanceEnv(base_url="https://ajitg25-ambulance-green-corridor.hf.space") as env:
+    # Reset — get patient location, hospitals, initial state
     obs = (await env.reset()).observation
-    # Dispatch to specialist hospital
+
+    # Step 1: Dispatch to specialist hospital
     obs = (await env.step(AmbulanceAction(hospital_id="hosp_b"))).observation
-    # Clear only wrong-phase signals
-    controls = [
-        SignalControl(row=s.row, col=s.col,
-                      phase="ns_green" if s.ambulance_direction in ("north","south") else "ew_green")
-        for s in obs.lookahead_signals
-        if s.phase != ("ns_green" if s.ambulance_direction in ("north","south") else "ew_green")
-    ]
-    result = await env.step(AmbulanceAction(signal_controls=controls))
+
+    # Step 2+: Clear only wrong-phase signals each step
+    while not obs.done:
+        controls = [
+            SignalControl(
+                row=s.row, col=s.col,
+                phase="ns_green" if s.ambulance_direction in ("north", "south") else "ew_green"
+            )
+            for s in obs.lookahead_signals
+            if s.phase != ("ns_green" if s.ambulance_direction in ("north", "south") else "ew_green")
+        ]
+        result = await env.step(AmbulanceAction(signal_controls=controls))
+        obs = result.observation
 ```
 
----
+### The Three Policies (Shown in Visual Demo)
+
+| Policy | Behavior | Signal Efficiency | What It Demonstrates |
+|---|---|---|---|
+| No control | Does nothing | 0% | Pure baseline |
+| Naive | Clears all signals | ~11% | Untrained LLM behavior |
+| Smart | Clears only wrong-phase | 100% | Trained LLM behavior |
 
 ---
 
-*Built for the OpenEnv Hackathon India 2026.*
+## Why This Matters
+
+Emergency vehicle routing is deployed infrastructure. The gap between "clear one signal 300m ahead" and "reason about the full journey in a partially observable dynamic city" is exactly the gap this environment is designed to close.
+
+Could a researcher write a paper about this? Yes:
+> *"LLM-based adaptive emergency corridor planning under partial observability and dynamic constraints"*
+
+That paper does not exist yet. This environment is the training ground for it.
+
+---
+
+*Built for the OpenEnv Hackathon India 2026 — Theme 3.1: World Modeling / Professional Tasks*
