@@ -1,0 +1,16 @@
+{
+  "baseline": {
+    "mean_reward": 1442.63,
+    "arrival_rate": 1.0,
+    "mean_efficiency": 0.1111111111111111,
+    "mean_time": 125.0,
+    "mean_reroutes": 0.0
+  },
+  "final": {
+    "mean_reward": 1445.34,
+    "arrival_rate": 1.0,
+    "mean_efficiency": 1.0,
+    "mean_time": 127.5,
+    "mean_reroutes": 0.0
+  }
+}
