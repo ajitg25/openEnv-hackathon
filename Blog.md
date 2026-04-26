@@ -150,8 +150,8 @@ The training curve shows the characteristic GRPO exploration-convergence pattern
 **Demo video:** [Watch on YouTube](https://youtu.be/9O5z4IXXtcc)  
 **Environment (OpenEnv WebSocket):** `wss://ajitg25-ambulance-green-corridor.hf.space/ws`  
 **Visual simulation:** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor  
-**GitHub (full code + notebook):** https://github.com/ajitg25/openEnv-hackathon/tree/final  
-**Training notebook:** https://github.com/ajitg25/openEnv-hackathon/blob/final/examples/ambulance_grpo_training.ipynb
+**GitHub (full code + notebook):** https://github.com/ajitg25/openEnv-hackathon/tree/main  
+**Training notebook:** https://github.com/ajitg25/openEnv-hackathon/blob/main/examples/ambulance_grpo_training.ipynb
 
 ### Connecting Your Own Agent
 

@@ -136,7 +136,7 @@ The training curve shows characteristic GRPO instability in iterations 2–4 (th
 
 ```bash
 # Clone and run locally
-git clone -b final https://github.com/ajitg25/openEnv-hackathon.git
+git clone -b main https://github.com/ajitg25/openEnv-hackathon.git
 cd openEnv-hackathon
 uv sync
 AMBULANCE_DIFFICULTY=easy uvicorn ambulance_env.server.app:app \
@@ -159,5 +159,5 @@ Training notebook: [`examples/ambulance_grpo_training.ipynb`](examples/ambulance
 - **HF Space (live):** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor
 - **Demo video:** https://youtu.be/9O5z4IXXtcc
 - **Blog post:** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor/blob/main/Blog.md
-- **Training notebook:** https://github.com/ajitg25/openEnv-hackathon/blob/final/examples/ambulance_grpo_training.ipynb
-- **GitHub:** https://github.com/ajitg25/openEnv-hackathon/tree/final
+- **Training notebook:** https://github.com/ajitg25/openEnv-hackathon/blob/main/examples/ambulance_grpo_training.ipynb
+- **GitHub:** https://github.com/ajitg25/openEnv-hackathon/tree/main
