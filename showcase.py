@@ -197,17 +197,69 @@ def health():
 
 
 # ---------------------------------------------------------------------------
+# OpenEnv-compatible endpoints (no /api prefix — for the validator)
+# The validator expects POST /reset, POST /step, GET /state at the root.
+# These share the same _env instance as the /api/* routes.
+# ---------------------------------------------------------------------------
+
+class ValidatorStepBody(BaseModel):
+    action: Optional[dict] = None
+
+@app.post("/reset")
+def validator_reset():
+    global _env
+    _env = AmbulanceEnvironment(difficulty=_difficulty)
+    obs = _env.reset()
+    return {"observation": obs.model_dump()}
+
+@app.post("/step")
+def validator_step(body: ValidatorStepBody):
+    if _env is None:
+        return {"error": "Call /reset first"}
+    action_data = body.action or {}
+    controls = [
+        SignalControl(row=c["row"], col=c["col"], phase=c["phase"])
+        for c in action_data.get("signal_controls", [])
+        if isinstance(c, dict) and "row" in c
+    ]
+    action = AmbulanceAction(
+        hospital_id=action_data.get("hospital_id"),
+        signal_controls=controls,
+        preferred_direction=action_data.get("preferred_direction"),
+    )
+    obs = _env.step(action)
+    return {
+        "observation": obs.model_dump(),
+        "reward": obs.reward,
+        "done": obs.done,
+    }
+
+@app.get("/state")
+def validator_state():
+    if _env is None:
+        return {"error": "No active env"}
+    return {"state": _env.state.model_dump()}
+
+@app.get("/health")
+def validator_health():
+    return {"status": "ok", "difficulty": _difficulty}
+
+
+# ---------------------------------------------------------------------------
 # Serve frontend static files
 # ---------------------------------------------------------------------------
 
-# Serve index.html at root
-@app.get("/")
+@app.get("/web")
 async def serve_index():
     return FileResponse(FRONTEND_DIR / "index.html")
 
+# Also serve at root for convenience
+@app.get("/")
+async def serve_root():
+    return FileResponse(FRONTEND_DIR / "index.html")
 
-# Serve all other static files (css, js)
-app.mount("/", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+app.mount("/css", StaticFiles(directory=str(FRONTEND_DIR / "css")), name="css")
+app.mount("/js", StaticFiles(directory=str(FRONTEND_DIR / "js")), name="js")
 
 
 # ---------------------------------------------------------------------------
