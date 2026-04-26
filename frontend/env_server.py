@@ -104,6 +104,41 @@ def signals():
     return {"signals": result}
 
 
+@app.post("/trigger_event")
+def trigger_event():
+    """Manually fire a dynamic event (accident or road closure)."""
+    if _env is None:
+        return {"error": "Call /reset first"}
+    import random
+    candidates = [
+        k for k in _env._segments
+        if k not in _env._event_affected_segments
+    ]
+    if not candidates:
+        return {"error": "No more segments to affect"}
+    key = random.choice(candidates)
+    seg = _env._segments[key]
+    _env._event_affected_segments.add(key)
+    seg.blocked = True
+    pos_list = list(key)
+    pos = pos_list[0] if isinstance(pos_list[0], tuple) else tuple(pos_list[0])
+    desc = f"Accident at {pos} — road blocked"
+    return {"description": desc, "position": list(pos)}
+
+
+@app.post("/spike_traffic")
+def spike_traffic():
+    """Spike traffic on random segments."""
+    if _env is None:
+        return {"error": "Call /reset first"}
+    import random
+    segs = list(_env._segments.values())
+    chosen = random.sample(segs, min(3, len(segs)))
+    for seg in chosen:
+        seg.current_traffic = min(1.0, seg.current_traffic + 0.35)
+    return {"spiked": len(chosen), "total": len(segs)}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
