@@ -156,5 +156,6 @@ Training notebook: [`examples/ambulance_grpo_training.ipynb`](examples/ambulance
 ## Links
 
 - **HF Space (live):** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor
+- **Blog post:** https://huggingface.co/spaces/Ajitg25/ambulance-green-corridor/blob/main/Blog.md
+- **Training notebook:** https://github.com/ajitg25/openEnv-hackathon/blob/final/examples/ambulance_grpo_training.ipynb
 - **GitHub:** https://github.com/ajitg25/openEnv-hackathon/tree/final
-- Blog post / video: _coming soon_
