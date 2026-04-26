@@ -29,5 +29,5 @@ ENV AMBULANCE_DIFFICULTY="easy"
 EXPOSE 7860
 
 # Showcase server: serves frontend + env API on one port
-# v2: difficulty selector fix
+# v3: serve frontend at root /
 CMD ["python", "showcase.py"]

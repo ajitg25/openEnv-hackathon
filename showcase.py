@@ -214,6 +214,7 @@ def demo_health():
 # Serve frontend
 # ---------------------------------------------------------------------------
 
+@app.get("/")
 @app.get("/web")
 async def serve_web():
     return FileResponse(FRONTEND_DIR / "index.html")
