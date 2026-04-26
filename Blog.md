@@ -33,7 +33,7 @@ Our environment prevents shortcuts in three ways:
 
 1. **Toggling already-green signals costs reward.** The agent must *read* signal state before acting — it cannot blindly clear everything.
 2. **Traffic volume slows the ambulance even on green.** The agent cannot just clear signals and assume it will go fast — it must reason about the traffic volume on each segment.
-3. **The nearest hospital is not always correct.** A cardiac patient sent to a trauma centre loses the +300 specialist bonus. The agent must match condition to specialization.
+3. **The nearest hospital is not always correct.** A cardiac patient sent to a trauma centre loses the +300 specialist bonus. But even the right specialist hospital may not be the best choice — if the route to it is gridlocked, clearing signals only gets you 20% speed through dense traffic. A farther hospital with lighter traffic and a lower ETA is the smarter pick. The agent must weigh specialization + distance + live traffic volume simultaneously, and be willing to switch hospitals mid-journey if conditions change.
 
 The agent must maintain a coherent world model across 15–30 steps, update it when dynamic events fire, and make non-obvious decisions that only pay off several steps later.
 
